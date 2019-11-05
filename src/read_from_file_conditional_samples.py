@@ -9,15 +9,16 @@ import tensorflow as tf
 import model, sample, encoder
 
 def interact_model(
-    model_name='345M',
+    model_path='/scratch/models/1558M',
     seed=None,
     nsamples=80,
     batch_size=40,
     length=None,
     temperature=1,
-    top_k=40,
+    top_k=10,
     top_p=1,
     models_dir='models',
+    input_path='input.txt',
 ):
     """
     Interactively run the model
@@ -39,7 +40,7 @@ def interact_model(
      :models_dir : path to parent folder containing model subfolders
      (i.e. contains the <model_name> folder)
     """
-    models_dir = os.path.expanduser(os.path.expandvars(models_dir))
+    models_dir = os.path.expanduser(os.path.expandvars(model_path))
     if batch_size is None:
         batch_size = 1
     assert nsamples % batch_size == 0
@@ -69,11 +70,11 @@ def interact_model(
         ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
         saver.restore(sess, ckpt)
 
+        raw_text = None
+        with open(input_path, "r") as f:
+            raw_text = f.read()
+
         while True:
-            raw_text = input("Model prompt >>> ")
-            while not raw_text:
-                print('Prompt should not be empty!')
-                raw_text = input("Model prompt >>> ")
             context_tokens = enc.encode(raw_text)
             generated = 0
             for _ in range(nsamples // batch_size):
@@ -89,15 +90,17 @@ def interact_model(
 
             
 def interact_model(
-    model_name='124M',
+    model_name='1558M',
+    model_path='/scratch/models/',
     seed=None,
-    nsamples=1,
+    nsamples=10,
     batch_size=1,
-    length=50,
-    temperature=1,
-    top_k=0,
+    length=10,
+    temperature=0.8,
+    top_k=40,
     top_p=1,
     models_dir='models',
+    input_path='input.txt',
 ):
     """
     Interactively run the model
@@ -119,7 +122,7 @@ def interact_model(
      :models_dir : path to parent folder containing model subfolders
      (i.e. contains the <model_name> folder)
     """
-    models_dir = os.path.expanduser(os.path.expandvars(models_dir))
+    models_dir = os.path.expanduser(os.path.expandvars((model_path)))
     if batch_size is None:
         batch_size = 1
     assert nsamples % batch_size == 0
@@ -150,10 +153,14 @@ def interact_model(
         saver.restore(sess, ckpt)
 
         while True:
-            raw_text = input("Model prompt >>> ")
-            while not raw_text:
-                print('Prompt should not be empty!')
-                raw_text = input("Model prompt >>> ")
+            raw_text = None
+            with open(input_path, "r") as f:
+                raw_text = f.read()
+
+            # raw_text = input("Model>>>")
+            # while not raw_text:
+            #     print('Prompt should not be empty!')
+            #     raw_text = input("Model prompt >>> ")
             context_tokens = enc.encode(raw_text)
             generated = 0
             for _ in range(nsamples // batch_size):
@@ -166,6 +173,7 @@ def interact_model(
                     print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                     print(text)
             print("=" * 80)
+            input("PRESS TO RELOAD")
 
 
 if __name__ == '__main__':
