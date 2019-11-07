@@ -5,6 +5,8 @@ import json
 import os
 import numpy as np
 import tensorflow as tf
+from flask import Flask
+from flask import request
 
 # MODEL
 
@@ -474,13 +476,13 @@ def get_encoder(model_name, models_dir):
 #             # print("=" * 80)
 # 
             
-def interact_model(
+def interact_model(sess,
     model_name='124M',
-    seed=None,
+    seed=1,
     nsamples=1,
     batch_size=1,
     length=50,
-    temperature=1,
+    temperature=0.5,
     top_k=0,
     top_p=1,
     models_dir='/home/bollu/gde/gpt2/models',
@@ -520,35 +522,42 @@ def interact_model(
     elif length > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
-    with tf.Session(graph=tf.Graph()) as sess:
-        context = tf.placeholder(tf.int32, [batch_size, None])
-        np.random.seed(seed)
-        tf.set_random_seed(seed)
-        output = sample_sequence(
-            hparams=hparams, length=length,
-            context=context,
-            batch_size=batch_size,
-            temperature=temperature, top_k=top_k, top_p=top_p
-        )
+    context = tf.placeholder(tf.int32, [batch_size, None])
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
+    output = sample_sequence(
+        hparams=hparams, length=length,
+        context=context,
+        batch_size=batch_size,
+        temperature=temperature, top_k=top_k, top_p=top_p
+    )
 
-        saver = tf.train.Saver()
-        ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
-        saver.restore(sess, ckpt)
-
-        def foo(raw_text):
-            context_tokens = enc.encode(raw_text)
-            generated = 0
-            for _ in range(nsamples // batch_size):
-                out = sess.run(output, feed_dict={
-                    context: [context_tokens for _ in range(batch_size)]
-                })[:, len(context_tokens):]
-                for i in range(batch_size):
-                    generated += 1
-                    text = enc.decode(out[i])
-                    return text
-        return foo
+    saver = tf.train.Saver()
+    ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
+    saver.restore(sess, ckpt)
 
 
-if __name__ == '__main__':
-    fire.Fire(interact_model)
+    def foo(raw_text):
+        context_tokens = enc.encode(raw_text)
+        generated = 0
+        for _ in range(nsamples // batch_size):
+            out = sess.run(output, feed_dict={
+                context: [context_tokens for _ in range(batch_size)]
+            })[:, len(context_tokens):]
+            for i in range(batch_size):
+                generated += 1
+                text = enc.decode(out[i])
+                return text[:length]
+    return foo
+
+
+app = Flask("gpt2server")
+
+@app.route("/response")
+def response():
+    intext = request.args.get("intext")
+    return "my response to input: " + intext
+
+# if __name__ == '__main__':
+#     fire.Fire(interact_model)
 
